@@ -4,12 +4,14 @@ import os
 from typing import IO, Any, BinaryIO
 from collections.abc import Iterable
 from jaxtyping import Float, Int
+
 import json
 import numpy.typing as npt
 import torch
 from torch import Tensor
 from utils import pre_tokenize
 import pickle
+
 from tqdm import tqdm
 import base64
 
@@ -541,10 +543,18 @@ def run_load_checkpoint(
     """
     raise NotImplementedError
 
-
+def get_tokenizer_from_vocab_merges_path():
+    vocab_path = "/Users/lyx/Downloads/Study/projects/python/assignment1-basics-main/data/TinyStoriesV2-GPT4-train.txt.vocab.json"
+    merges_path = "/Users/lyx/Downloads/Study/projects/python/assignment1-basics-main/data/TinyStoriesV2-GPT4-train.txt.merges.json"
+    vocab = json.load(open(vocab_path, 'r',encoding='utf-8'))
+    vocab = {int(k):v.encode('latin1') for k, v in vocab.items()}
+    with open(merges_path, "r", encoding="utf-8") as f:
+        merges_utf = json.load(f)
+        merges = [(a.encode('latin1'), b.encode('latin1')) for a, b in merges_utf]
+    return vocab, merges
 def get_tokenizer(
-    vocab: dict[int, bytes],
-    merges: list[tuple[bytes, bytes]],
+    vocab: dict[int, bytes] | None = None,
+    merges: list[tuple[bytes, bytes]] | None = None,
     special_tokens: list[str] | None = None,
 ) -> Any:
     """Given a vocabulary, a list of merges, and a list of special tokens,
@@ -562,9 +572,11 @@ def get_tokenizer(
     Returns:
         A BPE tokenizer that uses the provided vocab, merges, and special tokens.
     """
+
     if not vocab or not merges:
-        pass
-    raise NotImplementedError
+        vocab, merges = get_tokenizer_from_vocab_merges_path()
+    return vocab, merges
+    # raise NotImplementedError
 
 
 def run_train_bpe(
@@ -598,6 +610,7 @@ def run_train_bpe(
     if os.path.exists(counter_save_path):
         counter = pickle.load(open(counter_save_path, "rb"))
     else:
+
         counter = pre_tokenize(str(input_path),num_process=128)
         pickle.dump(counter, open(counter_save_path, "wb"))
     # counter = pre_tokenize(str(input_path),num_process=32)
@@ -652,9 +665,10 @@ def run_train_bpe(
     return vocab, merges
         
 if __name__ == "__main__":
+    # train tokenizer
     data_path = "/Users/lyx/Downloads/Study/projects/python/assignment1-basics-main/data/TinyStoriesV2-GPT4-train.txt"
     vocab_save_path = f"{data_path}.vocab.json"
-    merges_save_path = f"{data_path}.merges.txt"
+    merges_save_path = f"{data_path}.merges.json"
     vocab, merges = run_train_bpe(data_path,vocab_size=10000,special_tokens=["<|endoftext|>"])
 
     vocab_utf = {k: v.decode('latin1') for k, v in vocab.items()}
@@ -662,6 +676,11 @@ if __name__ == "__main__":
     with open(vocab_save_path, "w", encoding="utf-8") as f:
         json.dump(vocab_utf, f, ensure_ascii=False, indent=2)
     with open(merges_save_path, "w", encoding="utf-8") as f:
-        for merge in merges_utf:
-            f.write(f"{merge[0]},{merge[1]}\n")
+        json.dump(merges_utf, f, ensure_ascii=False, indent=2)
+
+    # load and use tokenizer
+    vocab_new, merges_new = get_tokenizer(vocab = None, merges = None, special_tokens=['<|endoftext|>'])
+    assert vocab == vocab_new
+    assert merges == merges_new
+
     
